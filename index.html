@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SALWA APP - Chat</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+
+      function trackEvent(category, action, label, value = null) {
+        gtag('event', action, {
+          'event_category': category,
+          'event_label': label,
+          'value': value
+        });
+      }
+    </script>
+
+    <!-- PeerJS untuk WebRTC -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-id {
+            background: #f0f0f0;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .user-id code {
+            background: #667eea;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .online-users {
+            list-style: none;
+        }
+        .online-user {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .online-user:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .online-user.active {
+            background: #667eea;
+            color: white;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: #28a745;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+        .chat-header {
+            padding: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 15px;
+        }
+        .chat-header h3 {
+            color: #333;
+        }
+        .chat-header p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px 15px;
+            border-radius: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .message.sent {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+        }
+        .message.received {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+        .message .sender {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .message .time {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-top: 5px;
+            text-align: right;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            outline: none;
+        }
+        .chat-input input:focus {
+            border-color: #667eea;
+        }
+        .chat-input button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .chat-input button:hover {
+            background: #5568d3;
+        }
+        .chat-input button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .no-chat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #999;
+            text-align: center;
+        }
+        .no-chat svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .connection-status {
+            padding: 10px;
+            background: #fff3cd;
+            color: #856404;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .btn-connect {
+            width: 100%;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .btn-connect:hover {
+            background: #218838;
+        }
+        .admin-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .admin-link a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            opacity: 0.9;
+        }
+        .admin-link a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            .chat-area {
+                height: 500px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💬 SALWA APP - Chat</h1>
+            <div class="user-info">
+                <div class="user-id">
+                    ID Anda: <code id="myPeerId">Connecting...</code>
+                </div>
+            </div>
+        </header>
+
+        <div class="connection-status" id="connectionStatus">
+            ⏳ Menghubungkan ke server PeerJS...
+        </div>
+
+        <div class="main-content">
+            <!-- Online Users Panel -->
+            <div class="panel">
+                <h2>👥 Pengguna Online</h2>
+                <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                    Klik nama untuk mulai chat
+                </p>
+                <ul class="online-users" id="onlineUsers">
+                    <li style="color: #999; text-align: center; padding: 20px;">
+                        Loading...
+                    </li>
+                </ul>
+                <button class="btn-connect" onclick="broadcastPresence()">
+                    📡 Broadcast Kehadiran
+                </button>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="panel chat-area">
+                <div class="chat-header">
+                    <h3 id="chatWith">Pilih pengguna untuk chat</h3>
+                    <p id="chatStatus">Belum ada chat aktif</p>
+                </div>
+
+                <div class="messages" id="messages">
+                    <div class="no-chat">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>Pilih pengguna dari daftar untuk memulai chat</p>
+                        <p style="font-size: 0.85em; margin-top: 10px;">
+                            Pesan tidak tersimpan setelah chat selesai
+                        </p>
+                    </div>
+                </div>
+
+                <div class="chat-input">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Ketik pesan..." 
+                        disabled
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    >
+                    <button id="sendBtn" onclick="sendMessage()" disabled>
+                        📤 Kirim
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-link">
+            <a href="admin.html" target="_blank">🔐 Admin Dashboard</a>
+        </div>
+    </div>
+
+    <script src="chat.js"></script>
+</body>
+</html>
